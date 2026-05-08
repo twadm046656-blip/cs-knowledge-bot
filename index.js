@@ -90,11 +90,12 @@ app.post("/chat", async (req, res) => {
 
     // ナレッジ取得
     const knowledgeList = await getKnowledge(message);
+console.log(knowledgeList)
 
     // Dify送信
     const payload = {
       inputs: {
-        knowledge: JSON.stringify(knowledgeList)
+        knowledge_db: JSON.stringify(knowledgeList)
       },
       query: message,
       user: userId,
