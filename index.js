@@ -25,9 +25,9 @@ const auth = new google.auth.GoogleAuth({
 const sheets = google.sheets({ version: "v4", auth });
 
 // =========================
-// ■ ナレッジ取得
+// ■ ナレッジ取得（内部用）
 // =========================
-async function getKnowledge(query) {
+async function getKnowledge(query = "") {
   const res = await sheets.spreadsheets.values.get({
     spreadsheetId: SPREADSHEET_ID,
     range: "knowledgeDB!A:E"
@@ -41,7 +41,9 @@ async function getKnowledge(query) {
     const question = rows[i][2] || "";
     const answer = rows[i][3] || "";
 
+    // queryが空なら全件取得
     if (
+      !query ||
       title.includes(query) ||
       question.includes(query) ||
       answer.includes(query)
@@ -54,11 +56,24 @@ async function getKnowledge(query) {
     }
   }
 
-  return results.slice(0, 5);
+  return results.slice(0, 50); // Dify用に少し多めでもOK（調整可）
 }
 
 // =========================
-// ■ ナレッジ保存（OK時）
+// ■ ナレッジ取得API（←追加これが重要）
+// =========================
+app.get("/knowledge", async (req, res) => {
+  try {
+    const data = await getKnowledge("");
+    return res.json(data);
+  } catch (error) {
+    console.error("knowledge取得エラー:", error);
+    return res.status(500).json({ error: "knowledge取得失敗" });
+  }
+});
+
+// =========================
+// ■ ナレッジ保存
 // =========================
 async function saveKnowledge({ title, question, answer }) {
   await sheets.spreadsheets.values.append({
@@ -96,19 +111,12 @@ app.post("/chat", async (req, res) => {
 
     console.log("knowledgeList:", knowledgeList);
 
-    // ★ ナレッジ0件対策
+    // ★ Difyは「文字列必須」なのでJSON文字列化
     const safeKnowledge =
       knowledgeList.length > 0
-        ? knowledgeList
-        : [
-            {
-              title: "ナレッジなし",
-              question: message,
-              answer: "該当するナレッジは見つかりませんでした"
-            }
-          ];
+        ? JSON.stringify(knowledgeList)
+        : "ナレッジは見つかりませんでした";
 
-    // ★ Dify送信（JSONのまま渡す）
     const payload = {
       inputs: {
         knowledge_db: safeKnowledge
