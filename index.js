@@ -88,19 +88,37 @@ app.post("/chat", async (req, res) => {
       return res.status(400).json({ error: "userIdとmessageは必須です" });
     }
 
+    console.log("==== REQUEST START ====");
+    console.log("message:", message);
+
     // ナレッジ取得
     const knowledgeList = await getKnowledge(message);
-console.log(knowledgeList)
 
-    // Dify送信
+    console.log("knowledgeList:", knowledgeList);
+
+    // ★ ナレッジ0件対策
+    const safeKnowledge =
+      knowledgeList.length > 0
+        ? knowledgeList
+        : [
+            {
+              title: "ナレッジなし",
+              question: message,
+              answer: "該当するナレッジは見つかりませんでした"
+            }
+          ];
+
+    // ★ Dify送信（JSONのまま渡す）
     const payload = {
       inputs: {
-        knowledge_db: JSON.stringify(knowledgeList)
+        knowledge_db: safeKnowledge
       },
       query: message,
       user: userId,
       response_mode: "blocking"
     };
+
+    console.log("payload:", JSON.stringify(payload, null, 2));
 
     const difyRes = await axios.post(
       "https://api.dify.ai/v1/chat-messages",
@@ -113,6 +131,8 @@ console.log(knowledgeList)
       }
     );
 
+    console.log("Dify response:", difyRes.data);
+
     const answer = difyRes.data.answer || "";
 
     return res.json({
@@ -121,13 +141,13 @@ console.log(knowledgeList)
     });
 
   } catch (error) {
-    console.error(error.response?.data || error.message);
+    console.error("エラー詳細:", error.response?.data || error.message);
     return res.status(500).json({ error: "server error" });
   }
 });
 
 // =========================
-// ■ ナレッジ保存API（OK押した時）
+// ■ ナレッジ保存API
 // =========================
 app.post("/save", async (req, res) => {
   try {
