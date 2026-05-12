@@ -323,4 +323,3 @@ app.listen(PORT, () => {
   console.log(`サーバー起動: ${PORT}`);
 
 });
-```
